@@ -1,0 +1,139 @@
+mongodb分片集群搭建：【演示效果见视频：mongodb-作业.mp4】
+0、准备3台虚拟机：192.168.80.129、192.168.80.130、192.168.80.132
+1、上传mongodb安装包：mongodb-linux-x86_64-4.1.3.tgz
+2、解压：tar -zxvf mongodb-linux-x86_64-4.1.3.tgz
+3、搭建配置集群：
+    节点1：
+    dbpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/data/config1
+    #日志文件位置 
+    logpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/logs/config1.log
+    #以追加方式写入日志 
+    logappend=true
+    #是否以守护进程方式运行
+    fork=true
+    bind_ip=192.168.80.129
+    port=17017
+    #表示是一个配置服务器
+    configsvr=true
+    #配置服务器副本集名称 
+    replSet=configsvr
+    节点2：
+    dbpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/data/config1
+    #日志文件位置 
+    logpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/logs/config1.log
+    #以追加方式写入日志 
+    logappend=true
+    #是否以守护进程方式运行
+    fork=true
+    bind_ip=192.168.80.130
+    port=17017
+    #表示是一个配置服务器
+    configsvr=true
+    #配置服务器副本集名称 
+    replSet=configsvr
+    节点3：
+    dbpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/data/config1
+    #日志文件位置 
+    logpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/logs/config1.log
+    #以追加方式写入日志 
+    logappend=true
+    #是否以守护进程方式运行
+    fork=true
+    bind_ip=192.168.80.132
+    port=17017
+    #表示是一个配置服务器
+    configsvr=true
+    #配置服务器副本集名称 
+    replSet=configsvr
+4、启动配置节点并进行集群配置：
+ ./../bin/mongod -f config-17017.conf
+ var cfg ={"_id":"configsvr", "members":[ {"_id":1,"host":"192.168.80.129:17017"}, {"_id":2,"host":"192.168.80.130:17017"}, {"_id":3,"host":"192.168.80.132:17017"} ]};
+ rs.initiate(cfg)
+ rs.status()
+5、搭建分片集群shard1：
+    节点1：
+    dbpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/shard
+    bind_ip=192.168.80.129
+    port=37017
+    fork=true
+    logpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/shard/shard1-37017.log
+    replSet=shard1 
+    shardsvr=true
+    节点2：
+    dbpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/shard
+    bind_ip=192.168.80.130
+    port=37017
+    fork=true
+    logpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/shard/shard1-37017.log
+    replSet=shard1 
+    shardsvr=true
+    节点3：
+    dbpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/shard
+    bind_ip=192.168.80.132
+    port=37017
+    fork=true
+    logpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/shard/shard1-37017.log
+    replSet=shard1 
+    shardsvr=true
+6、搭建分片集群shard2：
+    节点1：
+    dbpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/shard2
+    bind_ip=192.168.80.129
+    port=37018
+    fork=true
+    logpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/shard/shard2-37018.log
+    replSet=shard2 
+    shardsvr=true
+    节点2：
+    dbpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/shard2
+    bind_ip=192.168.80.130
+    port=37018
+    fork=true
+    logpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/shard/shard2-37018.log
+    replSet=shard2
+    shardsvr=true
+    节点3：
+    dbpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/shard2
+    bind_ip=192.168.80.132
+    port=37018
+    fork=true
+    logpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/shard/shard2-37018.log
+    replSet=shard2 
+    shardsvr=true
+7、启动分片节点：
+ ./../bin/mongod -f config-shard.conf
+ ./../bin/mongod -f config-shard2.conf
+8、分别进入其中一个进行集群配置
+shard1：
+var cfg ={"_id":"shard1", "protocolVersion" : 1, "members":[ {"_id":1,"host":"192.168.80.129:37017"}, {"_id":2,"host":"192.168.80.130:37017"}, {"_id":3,"host":"192.168.80.132:37017"} ]};
+rs.initiate(cfg)
+rs.status()
+shard2：
+var cfg ={"_id":"shard2", "protocolVersion" : 1, "members":[ {"_id":1,"host":"192.168.80.129:37018"}, {"_id":2,"host":"192.168.80.130:37018"}, {"_id":3,"host":"192.168.80.132:37018"} ]};
+rs.initiate(cfg)
+rs.status()
+9、配置路由节点并启动
+route-27017.conf
+配置：
+port=27017
+bind_ip=192.168.80.129
+fork=true
+logpath=/home/db/mongodb/mongodb-linux-x86_64-4.1.3/logs/route.log
+configdb=configsvr/192.168.80.129:17017,192.168.80.130:17017,192.168.80.132:17017
+启动：
+ ./../bin/mongos -f route-27017.conf
+10、链接到路由节点
+./../bin/mongo --host=192.168.80.129 --port=27017
+11、添加分片节点
+sh.addShard("shard1/192.168.80.129:37017,192.168.80.130:37017,192.168.80.132:37017");
+sh.addShard("shard2/192.168.80.129:37018,192.168.80.130:37018,192.168.80.132:37018");
+12、查看状态：
+sh.status()
+13、配置分片和路由：
+sh.enableSharding("lg_resume")
+sh.shardCollection("lg_resume.lg_resume_datas",{"name":"hashed"})
+14、创建账号并分配权限：
+db.createUser( {user:"root", pwd:"root", roles:[{role:"root",db:"admin"}] })
+db.createUser( {user:"lagou_gx", pwd:"abc321", roles:[{role:"readWrite",db:"lg_resume"}] })
+15、分别进入shard1和shard2进行验证
+16、开始插入数据，并测试
